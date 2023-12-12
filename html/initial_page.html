@@ -1,0 +1,17 @@
+<!DOCTYPE html><html lang=\"en\">
+    <body>
+        <script>
+            // test script
+            function getAudio(audioname) {
+                fetch( 'http://127.0.0.1:5050/?musicname='+audioname )
+                    .then( (response) => response.json())
+                    .then( (data) => {
+                        console.log(data[0].musicname)
+                    } );
+            }
+        </script>
+        <h1> HOME </h1>
+        <p>Hello world! :)</p>
+        <button onclick="getAudio('BabyElephantWalk60.wav')">Play</button>
+    </body>
+</html>

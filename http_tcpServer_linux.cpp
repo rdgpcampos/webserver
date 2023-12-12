@@ -54,7 +54,7 @@ namespace {
 		return output;
 	}
 
-	void handle_client(int socket) {
+	std::string handle_client(int socket) {
 		char buffer[BUFFER_SIZE] = {0};
 
 		// receive request data from client and store into buffer
@@ -64,16 +64,30 @@ namespace {
 			exitWithError("Failed to read bytes from client connection");
 		}
 
-		std::string request(buffer);
-		std::smatch m;
-		std::cout << request << std::endl;
+		// send music
+		if(std::regex_match(buffer, std::regex("^GET /.musicname([^ ]*) HTTP/1(.|\\n|\\r)*$"))) {
+			std::ostringstream ss;
+			const std::string request(buffer);
+			int pos1 = request.find("musicname");
+			int pos2 = request.find("HTTP");
 
-		// match GET request
-		if(std::regex_match(request, std::regex("^GET /([^ ]*) HTTP/1(.|\\n|\\r)*$"))) {
-			
+			std::string responsejson = "[{\"musicname\":\""+ request.substr(pos1+10,pos2-pos1-10) +"\"}]";
+			std::cout << responsejson << std::endl;
+			ss << "HTTP/1.1 200 OK\nContent-Type: application/json\nContent-Length: " << responsejson.size() << "\n\n" << responsejson;
+			return ss.str();
 		}
 
-		return;
+		// match GET request
+		//std::cout << buffer << std::endl; // see request string shape to adjust regex
+		if(std::regex_match(buffer, std::regex("^GET /([^ ]*) HTTP/1(.|\\n|\\r)*$"))) {
+			std::string html_file = readFileToString("../html/initial_page.html");
+			std::ostringstream ss;
+			ss << "HTTP/1.1 200 OK\nContent-Type: text/html\nContent-Length: " << html_file.size() << "\n\n" << html_file;
+
+			return ss.str();
+		}
+
+		return "";
 	}
 }
 
@@ -134,7 +148,10 @@ namespace http {
 			log("============Waiting for a new connection============\n\n\n");
 			acceptConnection(m_new_socket);
 
-			handle_client(m_new_socket);
+			char * response = (char *)malloc(BUFFER_SIZE * sizeof(char));
+			strcpy(response, handle_client(m_new_socket).c_str());
+			sendResponse(response);
+			free(response);
 
 			std::ostringstream ss;
 			ss << "--------Received request from client--------\n\n";
@@ -145,9 +162,6 @@ namespace http {
 			//pthread_create(&thread_id, NULL, handle_client, (void *)m_new_socket);
 			//pthread_detach(thread_id);
 			//std::cout<< "Passing socket to handler" << std::endl;
-
-			sendResponse();
-
 
 			close(m_new_socket);
 		}
@@ -166,21 +180,19 @@ namespace http {
 	}
 
 	std::string TcpServer::buildResponse() {
-		std::string script = readFileToString("../javascript/playBytes.js");
-
-		std::string html_file = "<!DOCTYPE html><html lang=\"en\"><body><script>"+script+"</script><h1> HOME </h1><p>Hello world! :)</p></body></html>";
+		std::string html_file = readFileToString("../html/initial_page.html");
 		std::ostringstream ss;
 		ss << "HTTP/1.1 200 OK\nContent-Type: text/html\nContent-Length: " << html_file.size() << "\n\n" << html_file;
 
 		return ss.str();
 	}
 
-	void TcpServer::sendResponse() {
+	void TcpServer::sendResponse(char * message) {
 		long bytes_sent;
+		
+		bytes_sent = write(m_new_socket, std::string(message).c_str(), std::string(message).size());
 
-		bytes_sent = write(m_new_socket, m_server_message.c_str(), m_server_message.size());
-
-		if (bytes_sent == m_server_message.size()) {
+		if (bytes_sent == std::string(message).size()) {
 			log("------- Server response sent to client -------\n\n");
 		} else {
 			log("Error sending response to client");

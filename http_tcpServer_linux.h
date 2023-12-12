@@ -28,7 +28,7 @@ namespace http {
 		void closeServer();
 		void acceptConnection(int &new_socket);
 		std::string buildResponse();
-		void sendResponse();
+		void sendResponse(char *);
 	};
 }
 
