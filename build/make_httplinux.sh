@@ -1,4 +1,4 @@
 #!/bin/sh
 
 rm HttpLinux
-gcc -I.. -o HttpLinux ../server_linux.cpp ../http_tcpServer_linux.cpp -lstdc++
+c++ -std=c++11 -I.. -o HttpLinux ../server_linux.cpp ../http_tcpServer_linux.cpp -lstdc++ -lcurl

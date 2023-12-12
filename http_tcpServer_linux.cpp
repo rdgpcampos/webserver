@@ -5,9 +5,144 @@
 #include <unistd.h>
 #include <map>
 #include <regex>
+#include <fstream>
+
 
 namespace {
 	const int BUFFER_SIZE = 30720;
+	typedef unsigned uchar;
+	static const std::string base64_chars =
+             "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+             "abcdefghijklmnopqrstuvwxyz"
+             "0123456789+/";
+
+
+	static inline bool is_base64(char c) {
+	return (isalnum(c) || (c == '+') || (c == '/'));
+	}
+
+	std::string base64_encode(char const* bytes_to_encode, unsigned int in_len) {
+	std::string ret;
+	int i = 0;
+	int j = 0;
+	char char_array_3[3];
+	char char_array_4[4];
+
+	while (in_len--) {
+		char_array_3[i++] = *(bytes_to_encode++);
+		if (i == 3) {
+		char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
+		char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
+		char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
+		char_array_4[3] = char_array_3[2] & 0x3f;
+
+		for(i = 0; (i <4) ; i++)
+			ret += base64_chars[char_array_4[i]];
+		i = 0;
+		}
+	}
+
+	if (i)
+	{
+		for(j = i; j < 3; j++)
+		char_array_3[j] = '\0';
+
+		char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
+		char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
+		char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
+		char_array_4[3] = char_array_3[2] & 0x3f;
+
+		for (j = 0; (j < i + 1); j++)
+		ret += base64_chars[char_array_4[j]];
+
+		while((i++ < 3))
+		ret += '=';
+
+	}
+
+	return ret;
+
+	}
+	std::string base64_decode(std::string const& encoded_string) {
+	int in_len = encoded_string.size();
+	int i = 0;
+	int j = 0;
+	int in_ = 0;
+	unsigned char char_array_4[4], char_array_3[3];
+	std::string ret;
+
+	while (in_len-- && ( encoded_string[in_] != '=') && is_base64(encoded_string[in_])) {
+		char_array_4[i++] = encoded_string[in_]; in_++;
+		if (i ==4) {
+		for (i = 0; i <4; i++)
+			char_array_4[i] = base64_chars.find(char_array_4[i]);
+
+		char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
+		char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
+		char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
+
+		for (i = 0; (i < 3); i++)
+			ret += char_array_3[i];
+		i = 0;
+		}
+	}
+
+	if (i) {
+		for (j = i; j <4; j++)
+		char_array_4[j] = 0;
+
+		for (j = 0; j <4; j++)
+		char_array_4[j] = base64_chars.find(char_array_4[j]);
+
+		char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
+		char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
+		char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
+
+		for (j = 0; (j < i - 1); j++) ret += char_array_3[j];
+	}
+
+	return ret;
+	}
+	
+	std::string encodeFile(const char * filename) {
+
+		std::ifstream infile(filename, std::ios::binary);
+		std::istreambuf_iterator<char> it{infile};
+
+		if (!infile) {
+			fputs("File could not be opened", stderr);
+			exit(1);
+		}
+
+		// get file size
+		int size;
+    	infile.seekg(0,std::ios::end);
+    	size = infile.tellg();
+		infile.seekg(0);
+
+		char * decoded_chars = new char[size+1];
+
+		infile.read(decoded_chars,size);
+
+		std::string encoded_string = base64_encode(decoded_chars, size);
+
+		delete[] decoded_chars;
+
+		return encoded_string;
+	}
+
+	std::string readFileAsBinary(const char * filename) {
+
+		std::ifstream infile(filename, std::ios::binary);
+		if (!infile) {
+			fputs("File could not be opened", stderr);
+			exit(1);
+		}
+
+		std::string decoded_string((std::istreambuf_iterator<char>(infile)), std::istreambuf_iterator<char>());
+
+		return decoded_string;
+	}
 
 	void log(const std::string &message) {
 		std::cout << message << std::endl;
@@ -70,11 +205,38 @@ namespace {
 			const std::string request(buffer);
 			int pos1 = request.find("musicname");
 			int pos2 = request.find("HTTP");
+			std::string filename_string = "../playlist/" + request.substr(pos1+10,pos2-pos1-11);
+			
+			const char * filename = &filename_string[0];
 
-			std::string responsejson = "[{\"musicname\":\""+ request.substr(pos1+10,pos2-pos1-10) +"\"}]";
-			std::cout << responsejson << std::endl;
-			ss << "HTTP/1.1 200 OK\nContent-Type: application/json\nContent-Length: " << responsejson.size() << "\n\n" << responsejson;
-			return ss.str();
+			std::string response = encodeFile(filename);
+
+			char * header = "HTTP/1.1 200 OK /audiofile.mp3\r\n"
+							//"Content-Type: multipart/form-data; boundary: myboundary\r\n"
+							"Content-Type: application/json\r\n"
+							"Accept: */*\r\n"
+							"Connection: close\r\n"
+							"\r\n";
+							//"--myboundary\r\n"
+							//"Content-Type: audio/x-wav\r\n"
+							//"Content-Disposition: attachment; name=\"audiofile\"; filename=\"myaudiofile.wav\"\r\n"
+							//"Content-Transfer-Encoding: base64\r\n";
+
+			send(socket, header, strlen(header),0);
+
+			char * response_array = new char[response.size()+13];
+			response = "{\"data\": \"" + response + "\"}";
+			strcpy(response_array, response.c_str());
+
+			send(socket,response_array, strlen(response_array),0);
+
+			delete[] response_array;
+
+			//char * footer = "\r\n"
+			//				"--myboundary--\r\n";
+			//send(socket,footer,strlen(footer),0);
+
+			return "";
 		}
 
 		// match GET request
@@ -149,6 +311,7 @@ namespace http {
 			acceptConnection(m_new_socket);
 
 			char * response = (char *)malloc(BUFFER_SIZE * sizeof(char));
+			//handle_client(m_new_socket);
 			strcpy(response, handle_client(m_new_socket).c_str());
 			sendResponse(response);
 			free(response);
@@ -189,8 +352,8 @@ namespace http {
 
 	void TcpServer::sendResponse(char * message) {
 		long bytes_sent;
-		
-		bytes_sent = write(m_new_socket, std::string(message).c_str(), std::string(message).size());
+		if (strlen(message) > 0) 
+			bytes_sent = write(m_new_socket, std::string(message).c_str(), std::string(message).size());
 
 		if (bytes_sent == std::string(message).size()) {
 			log("------- Server response sent to client -------\n\n");

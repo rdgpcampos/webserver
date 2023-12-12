@@ -79,6 +79,9 @@
         "map": "cpp",
         "regex": "cpp",
         "stack": "cpp",
-        "list": "cpp"
+        "list": "cpp",
+        "codecvt": "cpp",
+        "fstream": "cpp",
+        "iomanip": "cpp"
     }
 }

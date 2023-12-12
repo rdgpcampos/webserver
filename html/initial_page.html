@@ -4,14 +4,15 @@
             // test script
             function getAudio(audioname) {
                 fetch( 'http://127.0.0.1:5050/?musicname='+audioname )
-                    .then( (response) => response.json())
-                    .then( (data) => {
-                        console.log(data[0].musicname)
-                    } );
+                    .then( response => response.json())
+                    .then(json => {
+                        dataURL = "data:audio/mp3;base64," + json.data                        
+                        document.getElementById("play").innerHTML = '<audio id="audio-player" controls="controls" src=' + dataURL + ' type="audio/mp3">';
+                    } )
             }
         </script>
         <h1> HOME </h1>
         <p>Hello world! :)</p>
-        <button onclick="getAudio('BabyElephantWalk60.wav')">Play</button>
+        <button id="play" onclick="getAudio('example.mp3')">Play</button>
     </body>
 </html>
