@@ -6,6 +6,7 @@
 #include <arpa/inet.h>
 #include <stdlib.h>
 #include <string>
+#include <util.h>
 
 namespace http {
 	class TcpServer {
