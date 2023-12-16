@@ -6,7 +6,15 @@
 #include <arpa/inet.h>
 #include <stdlib.h>
 #include <string>
-#include <util.h>
+#include "util.h"
+#include <iostream>
+#include <sstream>
+#include <map>
+#include <fstream>
+#include <filesystem>
+
+#include "client_handler.h"
+
 
 namespace http {
 	class TcpServer {
@@ -29,7 +37,7 @@ namespace http {
 		void closeServer();
 		void acceptConnection(int &new_socket);
 		std::string buildResponse();
-		void sendResponse(char *);
+		void sendResponse(const char * message, const int length);
 	};
 }
 

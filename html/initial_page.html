@@ -66,7 +66,9 @@
                         // load json response to a list property that will populate the dropdown
                         var dropdown = document.getElementById("myDropdown");
                         
+
                         if (dropdown.childElementCount != json.length) {
+                            dropdown.innerHTML = ''; // clean list
                             for (let i = 0; i < json.length; i++) {
                                 var elem = document.createElement("button")
                                 dropdown.append(elem);
@@ -92,6 +94,16 @@
                     }
                 }
             }
+
+            // send file to server
+            function sendFileToServer() {
+                console.log("Submitting form");
+                let file = document.getElementById("myFile").files[0];
+                let formData = new FormData();
+                formData.append("file",file);
+
+                fetch('http://127.0.0.1:5050/',{method: "POST", body: file});
+            }
             
         </script>
         <h1> HOME </h1>
@@ -102,6 +114,10 @@
             <div id="myDropdown" class="dropdown-content">
             </div>
         </div>
+        <form action="javascript:;" onsubmit="sendFileToServer()" class="submit">
+            <input type="file" id="myFile" name="filename">
+            <input type="submit">    
+        </form>
         
     </body>
 </html>
