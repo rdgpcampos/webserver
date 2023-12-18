@@ -17,6 +17,5 @@ std::string readFileAsBinary(const char * filename);
 void log(const std::string &message);
 void exitWithError(const std::string &error_message);
 std::string readFileToString(const char * file_name);
-std::unordered_map<std::string,std::string> readJSToString(const char * html_name);
 
 #endif

@@ -50,5 +50,5 @@ function sendFileToServer() {
     let formData = new FormData();
     formData.append("file",file);
 
-    fetch('http://127.0.0.1:5050/',{method: "POST", body: file});
+    fetch('http://127.0.0.1:5050/?musicname='+file.name,{method: "POST", body: formData});
 }

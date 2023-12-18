@@ -4,11 +4,9 @@ namespace fs = std::__fs::filesystem;
 
 namespace handler {
 	void * handle_client(void * socket) {
-		char buffer[BUFFER_SIZE] = {0};
-		const int bytes_received = read(*(int *)socket, buffer, BUFFER_SIZE); // receive request data from client and store into buffer
-		const std::string request(buffer); // request as string
-		std::vector<std::string> response;
+        std::vector<std::string> response;
         buildResponse builder;
+        std::string request = getRequestAsString(socket, BUFFER_SIZE);
         const std::unordered_map<std::string, buildResponse> response_function = {
             {"GET /?musicname",&getMusicname},
             {"GET /musics", &getMusics},
@@ -16,11 +14,6 @@ namespace handler {
             {"GET /javascript", &getJS},
             {"POST /?musicname", &postMusicname}
         };
-
-        // test if content was read
-        if (bytes_received < 0) {
-			exitWithError("Failed to read bytes from client connection");
-		}
 
         // find method and endpoint
         int pos1 = request.find(" ");
@@ -49,11 +42,16 @@ namespace handler {
         }
         const std::string endpoint_parameter = endpoint_tmp;
 
+        //std::cout << endpoint_parameter << std::endl;
+
         // build response using appropriate function
         if (response_function.find(method+" "+endpoint_parameter) != response_function.end()) {
             builder  = response_function.at(method+" "+endpoint_parameter);
+            //int pos_content_length = request.find("Content-Length: ") + 16;
+            //if(pos_content_length > 16 && std::stoi(request.substr(pos_content_length,request.find("\r\n",pos_content_length)-pos_content_length)) > BUFFER_SIZE/2) {
+
             response = (*builder)(request);
-        } else if (access(("../javascript/"+endpoint_parameter.substr(1)).c_str(), F_OK) != -1) { // requesting js file
+        } else if (endpoint_parameter.length() > 1 && access(("../javascript/"+endpoint_parameter.substr(1)).c_str(), F_OK) != -1) { // requesting js file
             builder = response_function.at(method+" "+"/javascript");
             response = (*builder)(request);
         } else {
@@ -136,22 +134,12 @@ namespace handler {
         // get initial page
         std::string html_file = readFileToString("../html/initial_page.html");
 
-        //std::string js_file = readJSToString("../html/initial_page.html")["../javascript/playlist.js"];
-
         // build html page response
         header = "HTTP/1.1 200 OK\nContent-Type: text/html\nContent-Length: " + 
                                 std::to_string(html_file.size()) + "\n\n";
         body = html_file;
 
         response.push_back(header+body);
-        // build js page response
-        //header = "HTTP/1.1 200 OK\nContent-Type: text/javascript\n"
-        //                       "Content-Disposition: attachment; filename=\"playlist.js\"\n"
-        //                        "Content-Length: " +
-        //                        std::to_string(js_file.size()) + "\n\n";
-        //body = js_file;
-
-        //response.push_back(header+body);
 
         return response;
     }
@@ -197,8 +185,69 @@ namespace handler {
         std::string header;
 		std::string body;
         std::vector<std::string> response;
+        std::ofstream ofile("testfile.mp3");
+
+        // figure out how to get body from multiform request into ofile
+        int boundary_pos = request.find("boundary=");
+        std::string boundary = request.substr(boundary_pos+9,request.find("\r\n",boundary_pos)-boundary_pos-9);
+
+        std::cout << boundary << std::endl;
+
+        int first_boundary = request.find(boundary);
+        body = request.substr(request.find("Content-Type: ",first_boundary));
+        body = body.substr(body.find("\r\n"));
+
+        body = body.substr(4,body.find(boundary)-4);
+//        const char * file_data = body.c_str();
+
+        ofile.write(body.c_str(),body.length());
+
+        body = "NULL";
+        header = "HTTP/1.1 200 OK\nContent-Type: text/html\nContent-Length: " + 
+                                std::to_string(body.size()) + "\n\n";
+
+        //if (request.find(boundary,boundary_pos+10) != -1) std::cout << "there is a second boundary" << std::endl;
 
         response.push_back(header+body);
         return response;
+    }
+
+    std::string getRequestAsString(const void * socket, const int buffer_size) {
+        
+		std::vector<char> buffer(buffer_size);
+        static std::string request;
+        std::string cur_request; // request as string
+        static int cumulative_bytes = 0;
+        int bytes_received;
+        static int read_attempts = 0;
+
+        // cumulate data
+
+		bytes_received = read(*(int *)socket, &buffer[0], buffer_size); // receive request data from client and store into buffer
+
+        // test if content was read
+        if (bytes_received < 0) {
+			exitWithError("Failed to read bytes from client connection");
+		}
+
+        cur_request.assign(&buffer[0],bytes_received);
+        request.append(cur_request);
+        cumulative_bytes += bytes_received;
+
+
+        if(bytes_received == buffer_size && read_attempts < 100) {
+            read_attempts++;
+            return getRequestAsString(socket, buffer_size);
+        }
+
+        std::string return_string = request;
+
+        // clearing static variables
+        request.clear();
+        read_attempts = 0;
+        cumulative_bytes = 0;
+
+        return return_string;
+
     }
 }

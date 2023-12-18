@@ -11,7 +11,7 @@
 
 namespace handler {
     typedef std::vector<std::string> (*buildResponse) (std::string); 
-    const int BUFFER_SIZE = 30270;
+    const int BUFFER_SIZE = 30000;
     void * handle_client(void * client);
 
     std::vector<std::string> getMusicname(std::string request);
@@ -20,6 +20,7 @@ namespace handler {
     std::vector<std::string> postMusicname(std::string request);
     std::vector<std::string> getEmpty(std::string request);
     std::vector<std::string> getJS(std::string request);
+    std::string getRequestAsString(const void * socket, const int buffer_size);
 }
 
 #endif
