@@ -14,7 +14,6 @@
 
 #include "client_handler.h"
 
-
 namespace http {
 	class TcpServer {
 	public:

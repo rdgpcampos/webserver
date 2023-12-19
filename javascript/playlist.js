@@ -4,6 +4,7 @@ function getAudio(audioname) {
         .then(json => {
             dataURL = "data:audio/mp3;base64," + json.data;                        
             document.getElementById("audio-player").src = dataURL;
+            document.getElementById("delete-audio").name = audioname;
         } )
 }
 
@@ -45,10 +46,14 @@ window.onclick = function(event) {
 
 // send file to server
 function sendFileToServer() {
-    console.log("Submitting form");
     let file = document.getElementById("myFile").files[0];
     let formData = new FormData();
     formData.append("file",file);
 
     fetch('http://127.0.0.1:5050/?musicname='+file.name,{method: "POST", body: formData});
+}
+
+function deleteAudio() {
+    console.log("Delete "+document.getElementById("delete-audio").name);
+    fetch('http://127.0.0.1:5050/?musicname='+document.getElementById("delete-audio").name,{method: "DELETE"});
 }

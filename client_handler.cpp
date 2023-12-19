@@ -1,7 +1,5 @@
 #include <client_handler.h>
 
-namespace fs = std::__fs::filesystem;
-
 namespace handler {
 	void * handle_client(void * socket) {
         std::vector<std::string> response;
@@ -12,7 +10,8 @@ namespace handler {
             {"GET /musics", &getMusics},
             {"GET /", &get},
             {"GET /javascript", &getJS},
-            {"POST /?musicname", &postMusicname}
+            {"POST /?musicname", &postMusicname},
+            {"DELETE /?musicname", &deleteMusicname}
         };
 
         // find method and endpoint
@@ -47,8 +46,6 @@ namespace handler {
         // build response using appropriate function
         if (response_function.find(method+" "+endpoint_parameter) != response_function.end()) {
             builder  = response_function.at(method+" "+endpoint_parameter);
-            //int pos_content_length = request.find("Content-Length: ") + 16;
-            //if(pos_content_length > 16 && std::stoi(request.substr(pos_content_length,request.find("\r\n",pos_content_length)-pos_content_length)) > BUFFER_SIZE/2) {
 
             response = (*builder)(request);
         } else if (endpoint_parameter.length() > 1 && access(("../javascript/"+endpoint_parameter.substr(1)).c_str(), F_OK) != -1) { // requesting js file
@@ -113,6 +110,7 @@ namespace handler {
         body = "[";
         std::string playlist_path = "../playlist";
         for (const auto & music : fs::directory_iterator(playlist_path)) {
+            if(music.path().string().substr(playlist_path.length()+1,1) == ".") continue;
             body = body + 
                         "{\"name\":\"" +
                         music.path().string().substr(playlist_path.length()+1) +
@@ -149,10 +147,12 @@ namespace handler {
 		std::string body;
         std::vector<std::string> response;
 
+        // get request endpoint to find corresponding javascript file
         int pos1 = request.find(" ");
         int pos2 = request.find(" ",pos1+1);
         const std::string endpoint = request.substr(pos1+1,pos2-pos1-1);
 
+        // read javascript file
         std::string js_file = readFileToString(("../javascript" + endpoint).c_str());
 
         //build js page response
@@ -184,45 +184,68 @@ namespace handler {
     std::vector<std::string> postMusicname(std::string request) {
         std::string header;
 		std::string body;
+        std::string file_body;
         std::vector<std::string> response;
-        std::ofstream ofile("testfile.mp3");
 
-        // figure out how to get body from multiform request into ofile
+        // set filename as musicname (if name already exists, add a number between brackets to it)
+        int pos1 = request.find("musicname=");
+        int pos2 = request.find(" ",pos1);
+        const std::string musicname = "../playlist/" + request.substr(pos1+10,pos2-pos1-10);
+        std::ofstream ofile(setFileName(musicname));
+
+        // find boundary in request
         int boundary_pos = request.find("boundary=");
         std::string boundary = request.substr(boundary_pos+9,request.find("\r\n",boundary_pos)-boundary_pos-9);
-
-        std::cout << boundary << std::endl;
-
         int first_boundary = request.find(boundary);
-        body = request.substr(request.find("Content-Type: ",first_boundary));
-        body = body.substr(body.find("\r\n"));
 
-        body = body.substr(4,body.find(boundary)-4);
-//        const char * file_data = body.c_str();
+        // extract file body from request
+        file_body = request.substr(request.find("Content-Type: ",first_boundary));
+        file_body = file_body.substr(file_body.find("\r\n"));
+        file_body = file_body.substr(4,file_body.find(boundary)-8);
+        ofile.write(file_body.c_str(),file_body.length());
 
-        ofile.write(body.c_str(),body.length());
-
+        // build response
         body = "NULL";
         header = "HTTP/1.1 200 OK\nContent-Type: text/html\nContent-Length: " + 
                                 std::to_string(body.size()) + "\n\n";
-
-        //if (request.find(boundary,boundary_pos+10) != -1) std::cout << "there is a second boundary" << std::endl;
 
         response.push_back(header+body);
         return response;
     }
 
+    // delete audio file
+    std::vector<std::string> deleteMusicname(std::string request) {
+        std::string header;
+		std::string body;
+        std::vector<std::string> response;
+
+        // get music name
+        int pos1 = request.find("musicname=");
+        int pos2 = request.find(" ",pos1);
+        const std::string musicname = "../playlist/" + request.substr(pos1+10,pos2-pos1-10);
+
+        if (fs::remove(musicname)) {
+            header = "HTTP/1.1 200 OK\n";
+        } else {
+            header = "HTTP/1.1 404 File not found\n";
+        }
+
+        body = "NULL";
+
+        response.push_back(header+body);
+        return response;
+    }
+
+    // read from socket multiple times until request is consumed entirely
     std::string getRequestAsString(const void * socket, const int buffer_size) {
-        
 		std::vector<char> buffer(buffer_size);
-        static std::string request;
         std::string cur_request; // request as string
-        static int cumulative_bytes = 0;
         int bytes_received;
+        static std::string request;
+        static int cumulative_bytes = 0;
         static int read_attempts = 0;
 
-        // cumulate data
-
+        // read from socket
 		bytes_received = read(*(int *)socket, &buffer[0], buffer_size); // receive request data from client and store into buffer
 
         // test if content was read
@@ -230,11 +253,14 @@ namespace handler {
 			exitWithError("Failed to read bytes from client connection");
 		}
 
+        // get read content
         cur_request.assign(&buffer[0],bytes_received);
+
+        // cumulate content
         request.append(cur_request);
         cumulative_bytes += bytes_received;
 
-
+        // repeat until request is entirely consumed from socket or max limit is reached
         if(bytes_received == buffer_size && read_attempts < 100) {
             read_attempts++;
             return getRequestAsString(socket, buffer_size);

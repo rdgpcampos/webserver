@@ -166,3 +166,24 @@ std::string readFileToString(const char * file_name) {
     
     return output;
 }
+
+std::string setFileName(const std::string filepath) {
+    int filepath_dot = filepath.find_last_of(".");
+    std::string filepath_body = filepath.substr(0,filepath_dot);
+    std::string extension = filepath.substr(filepath_dot);
+    std::string unique_filepath = filepath;
+    int name_increment = 0;
+
+    std::regex re("(.*)\\(([0-9]+)\\)");
+    if (std::regex_match(filepath_body, re)) {
+        filepath_body = filepath_body.substr(0,filepath_body.find_last_of("("));
+    }
+
+    // check if file exists and if it does add 1 to the increment
+    while (access( unique_filepath.c_str(), F_OK ) != -1 ) {
+        name_increment++;
+        unique_filepath = filepath_body + "(" + std::to_string(name_increment) + ")" + extension;
+    }
+
+    return unique_filepath;
+}

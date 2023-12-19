@@ -9,6 +9,8 @@
 #include <unordered_map>
 #include <vector>
 
+namespace fs = std::__fs::filesystem;
+
 namespace handler {
     typedef std::vector<std::string> (*buildResponse) (std::string); 
     const int BUFFER_SIZE = 30000;
@@ -18,6 +20,7 @@ namespace handler {
     std::vector<std::string> getMusics(std::string request);
     std::vector<std::string> get(std::string request);
     std::vector<std::string> postMusicname(std::string request);
+    std::vector<std::string> deleteMusicname(std::string request);
     std::vector<std::string> getEmpty(std::string request);
     std::vector<std::string> getJS(std::string request);
     std::string getRequestAsString(const void * socket, const int buffer_size);
