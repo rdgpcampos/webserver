@@ -8,6 +8,7 @@ What's left to do:
     3. Prettify UI
     4. Put playlist path and port as app settings (DONE)
     5. util dependency is hidden, so add namespace (DONE)
+    6. Limit download type to audio files - mp3, ogg/oga/mogg, wav
 
 */
 
@@ -174,7 +175,7 @@ namespace handler {
             header = "HTTP/1.1 404 Page could not be loaded";
         } else {
             header = "HTTP/1.1 200 OK\nContent-Type: text/html\nContent-Length: " + 
-                                    std::to_string(html_file.size()) + "\n\n";
+                                    std::to_string(html_file.size()) + "\r\n\r\n";
         }
 
         response.push_back(header+body);
@@ -199,13 +200,13 @@ namespace handler {
 
         // build response
         if (body == "") {
-            header = "HTTP/1.1 404 File could not be opened\r\n";
+            header = "HTTP/1.1 404 File could not be opened\r\n\r\n";
         } else {
             //build js page response
             header = "HTTP/1.1 200 OK\nContent-Type: text/javascript\n"
                                 "Content-Disposition: attachment; filename=\"playlist.js\"\n"
                                     "Content-Length: " +
-                                    std::to_string(body.size()) + "\n\n"; 
+                                    std::to_string(body.size()) + "\r\n\r\n"; 
         }
 
         response.push_back(header+body);
@@ -218,7 +219,7 @@ namespace handler {
         std::vector<std::string> response;
 
         // build response
-        header = "HTTP/1.1 501 Not Implemented\r\n";
+        header = "HTTP/1.1 501 Not Implemented\r\n\r\n";
         body = "No way to respond to this request\r\n";
 
         response.push_back(header+body);
@@ -235,6 +236,15 @@ namespace handler {
         int pos1 = request.find("musicname=");
         int pos2 = request.find(" ",pos1);
         const std::string musicname = util::getPlaylistDirectory() + "/" + request.substr(pos1+10,pos2-pos1-10);
+
+        std::string extension = musicname.substr(musicname.find_last_of(".")+1);
+        if (!(extension == "mp3" || extension == "wav" || extension == "oga" || extension == "ogg" || extension == "mogg")) {
+            header = "HTTP/1.1 415 Unsupported Media Type\r\n\r\n";
+            body = "Only support mp3, wav, oga, ogg, mogg file types";
+            response.push_back(header+body);
+            return response;
+        }
+
         std::ofstream ofile(util::setFileName(musicname));
 
         // find boundary in request
@@ -249,13 +259,13 @@ namespace handler {
         ofile.write(file_body.c_str(),file_body.length());
 
         if ( (bool)ofile.eofbit || (bool)ofile.failbit || (bool)ofile.badbit) {
-            header = "HTTP/1.1 400 Bad Request\r\n";
+            header = "HTTP/1.1 400 Bad Request\r\n\r\n";
             body = "Failed to upload file, try again later\r\n";
         }
 
         // build response
         body = "";
-        header = "HTTP/1.1 200 OK\r\n";
+        header = "HTTP/1.1 200 OK\r\n\r\n";
 
         response.push_back(header+body);
         return response;
@@ -273,7 +283,7 @@ namespace handler {
         const std::string musicname = util::getPlaylistDirectory() + "/" + request.substr(pos1+10,pos2-pos1-10);
 
         if (fs::remove(musicname)) {
-            header = "HTTP/1.1 200 OK\n";
+            header = "HTTP/1.1 200 OK\r\n\r\n";
         } else {
             header = "HTTP/1.1 404 File not found\n";
         }
