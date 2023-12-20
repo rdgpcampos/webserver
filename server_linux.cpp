@@ -3,7 +3,7 @@
 int main() {
 	using namespace http;
 
-	TcpServer server = TcpServer("127.0.0.1",5050);
+	TcpServer server = TcpServer("127.0.0.1",util::getPort());
 	server.startListen();
 
 	return 0;

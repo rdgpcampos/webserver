@@ -1,10 +1,43 @@
 #include <client_handler.h>
 
+/*
+
+What's left to do:
+    1. Set http responses for fail cases (DONE)
+    2. Identify common string parsing operations and put them into separate functions 
+    3. Prettify UI
+    4. Put playlist path and port as app settings (DONE)
+    5. util dependency is hidden, so add namespace (DONE)
+
+*/
+
 namespace handler {
 	void * handle_client(void * socket) {
         std::vector<std::string> response;
         buildResponse builder;
         std::string request = getRequestAsString(socket, BUFFER_SIZE);
+
+        // error handling
+        if (request == "500") {
+            response.push_back("HTTP/1.1 500 Internal Server Error\r\n\r\nCould not read data from request");
+            char * response_array = new char[response[0].size()];
+            strcpy(response_array, response[0].c_str());
+            send(*(int *)socket,response_array, strlen(response_array),0);
+            delete[] response_array;
+            close(*(int *)socket);
+            return NULL;
+
+        } else if (request == "413") {
+            response.push_back("HTTP/1.1 413 Payload Too Large\r\nFile exceeds size limit");
+            char * response_array = new char[response[0].size()];
+            strcpy(response_array, response[0].c_str());
+            send(*(int *)socket,response_array, strlen(response_array),0);
+            delete[] response_array;
+            close(*(int *)socket);
+            return NULL;
+        }
+
+        // valid endpoints and their respective handler functions
         const std::unordered_map<std::string, buildResponse> response_function = {
             {"GET /?musicname",&getMusicname},
             {"GET /musics", &getMusics},
@@ -41,8 +74,6 @@ namespace handler {
         }
         const std::string endpoint_parameter = endpoint_tmp;
 
-        //std::cout << endpoint_parameter << std::endl;
-
         // build response using appropriate function
         if (response_function.find(method+" "+endpoint_parameter) != response_function.end()) {
             builder  = response_function.at(method+" "+endpoint_parameter);
@@ -75,20 +106,25 @@ namespace handler {
         int pos1 = request.find("musicname");
 		int pos2 = request.find("HTTP");
 
-        std::string filename_string = "../playlist/" + request.substr(pos1+10,pos2-pos1-11);
+        std::string filename_string = util::getPlaylistDirectory()+ "/" + request.substr(pos1+10,pos2-pos1-11);
 
         char * filename = &filename_string[0];
 
         // build body
-        body = encodeFile(filename); // convert to base64
-        body = "{\"data\": \"" + body + "\"}";
+        body = util::encodeFile(filename); // convert to base64
 
-        // build header
-        header = "HTTP/1.1 200 OK /audiofile.mp3\r\n"
-                        "Content-Type: application/json\r\n"
-                        "Accept: */*\r\n"
-                        "Connection: close\r\n"
-                        "\r\n";
+        // build response
+        if (body == "") {
+            header = "HTTP/1.1 404 File could not be opened\r\n";
+        } else {
+            header = "HTTP/1.1 200 OK /audiofile.mp3\r\n"
+                            "Content-Type: application/json\r\n"
+                            "Accept: */*\r\n"
+                            "Connection: close\r\n"
+                            "\r\n";
+
+            body = "{\"data\": \"" + body + "\"}";
+        }
 
         response.push_back(header+body);
         return response;
@@ -108,7 +144,7 @@ namespace handler {
 
         // prepare body containing playlist
         body = "[";
-        std::string playlist_path = "../playlist";
+        std::string playlist_path = util::getPlaylistDirectory();
         for (const auto & music : fs::directory_iterator(playlist_path)) {
             if(music.path().string().substr(playlist_path.length()+1,1) == ".") continue;
             body = body + 
@@ -130,12 +166,16 @@ namespace handler {
         std::vector<std::string> response;
 
         // get initial page
-        std::string html_file = readFileToString("../html/initial_page.html");
+        std::string html_file = util::readFileToString("../html/initial_page.html");
+        body = html_file;
 
         // build html page response
-        header = "HTTP/1.1 200 OK\nContent-Type: text/html\nContent-Length: " + 
-                                std::to_string(html_file.size()) + "\n\n";
-        body = html_file;
+        if (body == "") {
+            header = "HTTP/1.1 404 Page could not be loaded";
+        } else {
+            header = "HTTP/1.1 200 OK\nContent-Type: text/html\nContent-Length: " + 
+                                    std::to_string(html_file.size()) + "\n\n";
+        }
 
         response.push_back(header+body);
 
@@ -153,14 +193,20 @@ namespace handler {
         const std::string endpoint = request.substr(pos1+1,pos2-pos1-1);
 
         // read javascript file
-        std::string js_file = readFileToString(("../javascript" + endpoint).c_str());
+        std::string js_file = util::readFileToString(("../javascript" + endpoint).c_str());
 
-        //build js page response
-        header = "HTTP/1.1 200 OK\nContent-Type: text/javascript\n"
-                               "Content-Disposition: attachment; filename=\"playlist.js\"\n"
-                                "Content-Length: " +
-                                std::to_string(js_file.size()) + "\n\n";
         body = js_file;
+
+        // build response
+        if (body == "") {
+            header = "HTTP/1.1 404 File could not be opened\r\n";
+        } else {
+            //build js page response
+            header = "HTTP/1.1 200 OK\nContent-Type: text/javascript\n"
+                                "Content-Disposition: attachment; filename=\"playlist.js\"\n"
+                                    "Content-Length: " +
+                                    std::to_string(body.size()) + "\n\n"; 
+        }
 
         response.push_back(header+body);
         return response;
@@ -171,11 +217,9 @@ namespace handler {
 		std::string body;
         std::vector<std::string> response;
 
-        body = "NULL";
-
         // build response
-        header = "HTTP/1.1 200 OK\nContent-Type: text/html\nContent-Length: " + 
-                                std::to_string(body.size()) + "\n\n";
+        header = "HTTP/1.1 501 Not Implemented\r\n";
+        body = "No way to respond to this request\r\n";
 
         response.push_back(header+body);
         return response;
@@ -190,8 +234,8 @@ namespace handler {
         // set filename as musicname (if name already exists, add a number between brackets to it)
         int pos1 = request.find("musicname=");
         int pos2 = request.find(" ",pos1);
-        const std::string musicname = "../playlist/" + request.substr(pos1+10,pos2-pos1-10);
-        std::ofstream ofile(setFileName(musicname));
+        const std::string musicname = util::getPlaylistDirectory() + "/" + request.substr(pos1+10,pos2-pos1-10);
+        std::ofstream ofile(util::setFileName(musicname));
 
         // find boundary in request
         int boundary_pos = request.find("boundary=");
@@ -204,10 +248,14 @@ namespace handler {
         file_body = file_body.substr(4,file_body.find(boundary)-8);
         ofile.write(file_body.c_str(),file_body.length());
 
+        if ( (bool)ofile.eofbit || (bool)ofile.failbit || (bool)ofile.badbit) {
+            header = "HTTP/1.1 400 Bad Request\r\n";
+            body = "Failed to upload file, try again later\r\n";
+        }
+
         // build response
-        body = "NULL";
-        header = "HTTP/1.1 200 OK\nContent-Type: text/html\nContent-Length: " + 
-                                std::to_string(body.size()) + "\n\n";
+        body = "";
+        header = "HTTP/1.1 200 OK\r\n";
 
         response.push_back(header+body);
         return response;
@@ -222,7 +270,7 @@ namespace handler {
         // get music name
         int pos1 = request.find("musicname=");
         int pos2 = request.find(" ",pos1);
-        const std::string musicname = "../playlist/" + request.substr(pos1+10,pos2-pos1-10);
+        const std::string musicname = util::getPlaylistDirectory() + "/" + request.substr(pos1+10,pos2-pos1-10);
 
         if (fs::remove(musicname)) {
             header = "HTTP/1.1 200 OK\n";
@@ -230,7 +278,7 @@ namespace handler {
             header = "HTTP/1.1 404 File not found\n";
         }
 
-        body = "NULL";
+        body = "";
 
         response.push_back(header+body);
         return response;
@@ -250,7 +298,7 @@ namespace handler {
 
         // test if content was read
         if (bytes_received < 0) {
-			exitWithError("Failed to read bytes from client connection");
+            return "500";
 		}
 
         // get read content
@@ -267,6 +315,10 @@ namespace handler {
         }
 
         std::string return_string = request;
+
+        if (read_attempts == 100) {
+            return "413";
+        }
 
         // clearing static variables
         request.clear();

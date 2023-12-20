@@ -11,14 +11,18 @@
 #include <unistd.h>
 #include <regex>
 
-static inline bool is_base64(char c);
-std::string base64_encode(char const* bytes_to_encode, unsigned int in_len);
-std::string base64_decode(std::string const& encoded_string);
-std::string encodeFile(const char * filename);
-std::string readFileAsBinary(const char * filename);
-void log(const std::string &message);
-void exitWithError(const std::string &error_message);
-std::string readFileToString(const char * file_name);
-std::string setFileName(const std::string filepath);
+namespace util {
+    static inline bool is_base64(char c);
+    std::string base64_encode(char const* bytes_to_encode, unsigned int in_len);
+    std::string base64_decode(std::string const& encoded_string);
+    std::string encodeFile(const char * filename);
+    std::string readFileAsBinary(const char * filename);
+    void log(const std::string &message);
+    void exitWithError(const std::string &error_message);
+    std::string readFileToString(const char * file_name);
+    std::string setFileName(const std::string filepath);
+    std::string getPlaylistDirectory();
+    int getPort();
+}
 
 #endif
