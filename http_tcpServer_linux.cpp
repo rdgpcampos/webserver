@@ -3,7 +3,7 @@
 namespace http {
 	TcpServer::TcpServer(std::string ip_address, int port) :
 	m_ip_address(ip_address), m_port(port), m_socket(),
-	m_new_socket(), m_incoming_message(), m_socket_address(),
+	m_new_socket(), m_socket_address(),
 	m_socket_address_len(sizeof(m_socket_address)), m_server_message(buildResponse()) 
 	{
 		m_socket_address.sin_family = AF_INET;
@@ -22,6 +22,7 @@ namespace http {
 
 	int TcpServer::startServer() {
 		m_socket = socket(AF_INET,SOCK_STREAM,0);
+
 		if (m_socket < 0) {
 			util::exitWithError("Cannot create socket");
 			return 1;
@@ -62,6 +63,12 @@ namespace http {
 			pthread_t thread_id;
 			int *socket = (int *)malloc(sizeof(*socket));
 			*socket = m_new_socket;
+
+			int flags;
+			if (-1 == (flags = fcntl(m_new_socket, F_GETFL, 0))) flags = 0;
+			// setting non-blocking socket
+			fcntl(m_new_socket, F_SETFL, flags | O_NONBLOCK);
+
 			pthread_create(&thread_id, NULL, &handler::handle_client, (void *)socket);
 			pthread_detach(thread_id);
 			std::cout<< "Passing socket to handler" << std::endl;
@@ -89,14 +96,157 @@ namespace http {
 	}
 
 	void TcpServer::sendResponse(const char * message, const int length) {
-		long bytes_sent;
+		long bytes_sent = 0;
 		if (length > 0) 
 			bytes_sent = send(m_new_socket, message, length, 0);
 
-		if (bytes_sent == std::string(message).size()) {
+		if (bytes_sent == (long)std::string(message).size()) {
 			util::log("------- Server response sent to client -------\n\n");
 		} else {
 			util::log("Error sending response to client");
 		}
 	}
+
+	// read from socket multiple times until request is consumed entirely
+	// this assumes that request fits in RAM, which is not the case for large files (videos for instance)
+    std::string getRequestAsString(const void * socket, const int buffer_size) {
+		std::vector<char> buffer(buffer_size);
+        std::string cur_request; // request as string
+        int bytes_received;
+        static std::string request;
+        static int cumulative_bytes = 0;
+        static int read_attempts = 0;
+        static int timeout_attempt = 0;
+
+        // read from socket
+		bytes_received = readWithRetry(socket, &buffer[0], buffer_size); // receive request data from client and store into buffer
+
+        // test if content was read
+        if (bytes_received < 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            timeout_attempt++;
+            return timeout_attempt>5? "500" : getRequestAsString(socket, buffer_size);
+		}
+
+        // get read content
+        cur_request.assign(&buffer[0],bytes_received);
+
+        // cumulate content
+        request.append(cur_request);
+        cumulative_bytes += bytes_received;
+
+        // repeat until request is entirely consumed from socket or max limit is reached
+        if(bytes_received == buffer_size && read_attempts < 100) {
+            read_attempts++;
+            return getRequestAsString(socket, buffer_size);
+        }
+
+        std::string return_string = request;
+
+        if (read_attempts == 100) {
+            return "413";
+        }
+
+        // clearing static variables
+        request.clear();
+        read_attempts = 0;
+        cumulative_bytes = 0;
+
+        return return_string;
+
+    }
+
+	int readWithRetry(const void * socket, char * buffer, int buffer_size) {
+		int bytes_received = 0;
+		int read_attempts = 0;
+
+		do {
+			bytes_received = read(*(int *)socket, buffer, buffer_size);
+			if (bytes_received < 0) {
+				if (read_attempts++ > 5) break;
+				std::this_thread::sleep_for(std::chrono::milliseconds(50)); // try again after 20 milliseconds
+				bytes_received = 0;
+			}
+		} while (bytes_received == 0);
+
+		return bytes_received;
+	}
+
+    int sendWithRetry(int socket, const char * message, int message_size) {
+        int total_bytes_sent = 0;
+        int bytes_sent_now = 0;
+        int send_attempts = 0;
+
+        do {
+            bytes_sent_now = send(socket, &message[total_bytes_sent], message_size-total_bytes_sent, 0);
+            if (bytes_sent_now > 0) {
+				total_bytes_sent += bytes_sent_now;
+				send_attempts = 0;
+            } else {
+                std::this_thread::sleep_for(std::chrono::milliseconds(20)); // try again after 20 milliseconds
+                if (send_attempts++ > 5) return -1; // fail too many times
+            }
+        } while (total_bytes_sent < message_size);
+
+        return total_bytes_sent;
+    }
+
+/*
+	MessageTransfer::MessageTransfer(const int socket, const int message_size) : socket(socket), message_size(message_size) {};
+	MessageTransfer::~MessageTransfer() {};
+
+	// Dijkstra's bounded buffer
+	void MessageTransfer::transferMessage() {
+		std::thread t1([this](){this->producer();});
+		std::thread t2([this](){this->consumer();});
+		t1.join();
+		t2.join();
+	}
+
+	void MessageTransfer::producer() {
+		std::vector<char> in_buffer(100);
+		int bytes_in_buffer = 0;
+		int bytes_received = 0;
+
+		while(bytes_received < message_size) {
+			if (bytes_in_buffer == 0) {
+				in_buffer.clear();
+				bytes_in_buffer = readWithRetry((void *)&socket, &in_buffer[0], 100);
+				bytes_received += bytes_in_buffer;
+			}
+			number_of_empty_positions.acquire();
+			{
+				std::lock_guard<std::mutex> g(buffer_manipulation);
+				bounded_buffer.push(in_buffer[bytes_in_buffer]);
+				bytes_in_buffer--;
+			}
+			number_of_queueing_positions.release();
+		}
+	}
+
+	void MessageTransfer::consumer() {
+		std::vector<char> out_buffer(100);
+		int bytes_in_buffer = 0;
+		int bytes_sent = 0;
+		//int bytes_sent_now = 0;
+
+		while(bytes_sent < message_size) {
+			number_of_queueing_positions.acquire();
+			{
+				std::lock_guard<std::mutex> g(buffer_manipulation);
+				out_buffer[bytes_in_buffer] = bounded_buffer.front();
+				bytes_in_buffer++;
+				bounded_buffer.pop();
+			}
+			number_of_empty_positions.release();
+			if (bytes_in_buffer == 100) {
+				//bytes_sent_now = sendWithRetry(socket, &out_buffer[0], bytes_in_buffer); 
+				std::cout << &out_buffer << std::endl;
+				out_buffer.clear();
+				bytes_sent -= 100;
+				bytes_sent += 100;  
+			}
+		}
+	}
+*/
 }

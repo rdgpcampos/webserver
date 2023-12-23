@@ -12,6 +12,7 @@
 #include <regex>
 
 namespace util {
+    const int BUFFER_SIZE = 30000;
     static inline bool is_base64(char c);
     std::string base64_encode(char const* bytes_to_encode, unsigned int in_len);
     std::string base64_decode(std::string const& encoded_string);

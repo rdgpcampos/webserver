@@ -1,5 +1,7 @@
+const url = window.location.host;
+
 function getAudio(audioname) {
-    fetch( 'http://127.0.0.1:5050/?musicname='+audioname )
+    fetch( '/?musicname='+audioname )
         .then( response => response.json() )
         .then(json => {
             dataURL = "data:audio/mp3;base64," + json.data;                        
@@ -9,7 +11,7 @@ function getAudio(audioname) {
 }
 
 function loadPlaylist() {
-    fetch( 'http://127.0.0.1:5050/musics' )
+    fetch( '/musics' )
         .then( response => response.json() )
         .then( json => {
             // load json response to a list property that will populate the dropdown
@@ -50,10 +52,10 @@ function sendFileToServer() {
     let formData = new FormData();
     formData.append("file",file);
 
-    fetch('http://127.0.0.1:5050/?musicname='+file.name,{method: "POST", body: formData});
+    fetch( '/?musicname='+file.name,{method: "POST", body: formData} );
 }
 
 function deleteAudio() {
     console.log("Delete "+document.getElementById("delete-audio").name);
-    fetch('http://127.0.0.1:5050/?musicname='+document.getElementById("delete-audio").name,{method: "DELETE"});
+    fetch( '/?musicname='+document.getElementById("delete-audio").name,{method: "DELETE"} );
 }

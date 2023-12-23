@@ -4,11 +4,14 @@
 
 What's left to do:
     1. Set http responses for fail cases (DONE)
-    2. Identify common string parsing operations and put them into separate functions 
+    2. Identify common string parsing operations and put them into separate functions (Another time)
     3. Prettify UI
     4. Put playlist path and port as app settings (DONE)
     5. util dependency is hidden, so add namespace (DONE)
-    6. Limit download type to audio files - mp3, ogg/oga/mogg, wav
+    6. Limit download type to audio files - mp3, ogg/oga/mogg, wav (DONE)
+    7. Use a producer/consumer pattern to allow bigger files to be uploaded (Will move this to different project)
+    8. Now that socket is non-blocking, need to create specialized functions to read and write to it (DONE)
+    9. Remove socket communication responsibility from handler and give it to http (DONE)
 
 */
 
@@ -16,7 +19,7 @@ namespace handler {
 	void * handle_client(void * socket) {
         std::vector<std::string> response;
         buildResponse builder;
-        std::string request = getRequestAsString(socket, BUFFER_SIZE);
+        std::string request = http::getRequestAsString(socket, util::BUFFER_SIZE);
 
         // error handling
         if (request == "500") {
@@ -54,7 +57,7 @@ namespace handler {
         const std::string method = request.substr(0,pos1);
         const std::string endpoint = request.substr(pos1+1,pos2-pos1-1);
         std::string endpoint_tmp;
-        if (endpoint.find("=") == -1) {
+        if (endpoint.find("=") == (long)-1) {
             endpoint_tmp = endpoint.substr(0,endpoint.find_last_of(" "));
         } else {
             int pos_tmp = endpoint.find("=");
@@ -78,8 +81,8 @@ namespace handler {
         // build response using appropriate function
         if (response_function.find(method+" "+endpoint_parameter) != response_function.end()) {
             builder  = response_function.at(method+" "+endpoint_parameter);
-
             response = (*builder)(request);
+
         } else if (endpoint_parameter.length() > 1 && access(("../javascript/"+endpoint_parameter.substr(1)).c_str(), F_OK) != -1) { // requesting js file
             builder = response_function.at(method+" "+"/javascript");
             response = (*builder)(request);
@@ -91,7 +94,7 @@ namespace handler {
         for (const auto & res : response) {
             char * response_array = new char[res.size()];
             strcpy(response_array, res.c_str());
-            send(*(int *)socket,response_array, strlen(response_array),0);
+            http::sendWithRetry(*(int *)socket,response_array, res.size());
             delete[] response_array;
         }
 		close(*(int *)socket);
@@ -232,6 +235,7 @@ namespace handler {
         std::string file_body;
         std::vector<std::string> response;
 
+
         // set filename as musicname (if name already exists, add a number between brackets to it)
         int pos1 = request.find("musicname=");
         int pos2 = request.find(" ",pos1);
@@ -269,6 +273,7 @@ namespace handler {
 
         response.push_back(header+body);
         return response;
+
     }
 
     // delete audio file
@@ -292,50 +297,5 @@ namespace handler {
 
         response.push_back(header+body);
         return response;
-    }
-
-    // read from socket multiple times until request is consumed entirely
-    std::string getRequestAsString(const void * socket, const int buffer_size) {
-		std::vector<char> buffer(buffer_size);
-        std::string cur_request; // request as string
-        int bytes_received;
-        static std::string request;
-        static int cumulative_bytes = 0;
-        static int read_attempts = 0;
-
-        // read from socket
-		bytes_received = read(*(int *)socket, &buffer[0], buffer_size); // receive request data from client and store into buffer
-
-        // test if content was read
-        if (bytes_received < 0) {
-            return "500";
-		}
-
-        // get read content
-        cur_request.assign(&buffer[0],bytes_received);
-
-        // cumulate content
-        request.append(cur_request);
-        cumulative_bytes += bytes_received;
-
-        // repeat until request is entirely consumed from socket or max limit is reached
-        if(bytes_received == buffer_size && read_attempts < 100) {
-            read_attempts++;
-            return getRequestAsString(socket, buffer_size);
-        }
-
-        std::string return_string = request;
-
-        if (read_attempts == 100) {
-            return "413";
-        }
-
-        // clearing static variables
-        request.clear();
-        read_attempts = 0;
-        cumulative_bytes = 0;
-
-        return return_string;
-
     }
 }

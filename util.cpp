@@ -133,7 +133,7 @@ namespace util {
 
     std::string readFileToString(const char * file_name) {
         FILE *fp;
-        long l_size;
+        unsigned long l_size;
         size_t result;
         char * buffer;
         
