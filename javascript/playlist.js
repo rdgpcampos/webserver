@@ -7,7 +7,9 @@ function getAudio(audioname) {
         .then(json => {
             dataURL = "data:audio/mp3;base64," + json.data;                        
             document.getElementById("audio-player").src = dataURL;
-        } )
+        } ).finally(() => {
+            document.getElementById("song-title").textContent = audioname;
+        });
 }
 
 function toggleModal(toggle_flag) {
@@ -38,14 +40,17 @@ function loadPlaylist() {
 
             if (dropdown.childElementCount != json.length) {
                 dropdown.innerHTML = ''; // clean list
+                json.sort(function(a,b){
+                    return a.name.localeCompare(b.name);
+                });
                 for (let i = 0; i < json.length; i++) {
                     var elem = document.createElement("div")
                     dropdown.append(elem);
-                    elem.style.display = "inline-block";
-                    elem.style.verticalAlign = "center";
-                    elem.style.width = "300px";
-                    elem.innerHTML = "<button onclick='getAudio(\""+ json[i].name +"\")' class='song-option'>"+ json[i].name +"</button>";
-                    elem.innerHTML += "<button onclick='deleteAudio(\""+json[i].name +"\")' class='song-delete-button'></button>";
+                    elem.style.verticalAlign = "baseline";
+                    elem.style.height = "30px";
+                    elem.style.width = "200px";
+                    elem.innerHTML = "<span class='button-span'><button onclick='getAudio(\""+ json[i].name +"\")' class='song-option'>"+ json[i].name +"</button></span>";
+                    elem.innerHTML += "<span class='button-span'><button onclick='deleteAudio(\""+json[i].name +"\")' class='song-delete-button'></button></span>";
                 }
             }
 

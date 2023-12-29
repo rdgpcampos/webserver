@@ -1,2 +1,2 @@
-Port: 5050
+Port: 5051
 PlaylistDirectory: ../playlist

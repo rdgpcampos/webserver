@@ -8,20 +8,47 @@
           color: #f1f1f1;
           text-align: center;
           background: #5a27a3;
+          font-family: Georgia, serif;
         }
-        .player {
-          position: fixed;
-          top: 30%;
+
+        #audio-player {
+          position: absolute;
+          top: 40%;
           left: 50%;
+          width: 300px;
+          height: 54px;
           margin-top: -27px;
           margin-left: -150px;
         }
 
+        #song-title {
+          position: absolute;
+          font-size: large;
+          color: #f1f1f1;
+          text-align: center;
+          width: 200px;
+          height: 25px;
+          top: 35%;
+          left: 50%;
+          margin-top: -12.5px;
+          margin-left: -100px;
+        }
+
+        .button-span {
+          line-height: 30px;
+          height: 35px;
+          display: inline-block;
+          vertical-align: middle;
+          position: relative;
+        }
+
         .song-option {
           width: 150px;
+          height: 22px;
           background-color: #5a27a3;
-          margin-top: 2px;
-          margin-bottom: 2px;
+          position: absolute;
+          top: 50%;
+          margin-top: -11px;
           color: #f1f1f1;
           text-align: left;
         }
@@ -29,17 +56,24 @@
         .song-delete-button {
           background-image: url('trashbin.jpeg');
           background-size: cover;
+          position: absolute;
+          left: 155px;
+          margin-top: -11px;
+          top: 50%;
           height: 22px;
           width: 22px;
-          margin-left: 2px;
         }
 
         .submit-modal {
-          position: absolute;
-          top: 30%;
-          left: 80%;
-          width: 400px;
-          height: 300px;
+          width: fit-content;
+          height: fit-content;
+          background-color: #5a27a3;
+        }
+
+        .submit-modal-button {
+          background-color: #5a27a3;
+          font-size: large;
+          color: #f1f1f1;
         }
 
         #backdrop {
@@ -58,7 +92,8 @@
           padding-left: 10px;
           width: 200px;
           height: 100%;
-          background: #8342ddd0;
+          background: #8342dd7c;
+          font-family: Georgia, serif;
         }
 
         #playlist-dropdown {
@@ -129,7 +164,7 @@
         .show {display: block;}
         </style>
     </head>
-    <body onload="loadPlaylist()" style="background-image: url('purple-background2.webp'); background-size: cover;">
+    <body onload="loadPlaylist()" style="background-image: url('purple-background2.jpg'); background-size: cover;">
 
       <div id="backdrop" onclick="toggleModal(false)"></div>
 
@@ -138,16 +173,17 @@
         <h1> AWESOME MUSIC PLAYER </h1>
       </div>
 
+      <p id="song-title"></p>
       <audio id="audio-player" controls="controls" src="" type="audio/mp3" class="player"></audio>
-      
+
       <div id="playlist-pane">
         <p style="font-size:20px; text-align: center;">Your Playlist</p>
+        <div class="submit-modal">
+          <button onclick="toggleModal(true)" class="submit-modal-button">+</button>
+        </div>
         <div id="playlist-dropdown"></div>
       </div>
 
-      <div class="submit-modal">
-        <button onclick="toggleModal(true)">Add a song</button>
-      </div>
       <div id="modal">
         <form action="javascript:;" onsubmit="sendFileToServer()" class="submit">
           <input type="file" id="myFile" name="filename">
