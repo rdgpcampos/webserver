@@ -5,7 +5,7 @@
 What's left to do:
     1. Set http responses for fail cases (DONE)
     2. Identify common string parsing operations and put them into separate functions (ANOTHER TIME)
-    3. Prettify UI
+    3. Prettify UI (DONE)
     4. Put playlist path and port as app settings (DONE)
     5. util dependency is hidden, so add namespace (DONE)
     6. Limit download type to audio files - mp3, ogg/oga/mogg, wav (DONE)
