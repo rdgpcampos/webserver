@@ -23,6 +23,8 @@ namespace handler {
     std::vector<std::string> deleteMusicname(std::string request);
     std::vector<std::string> getEmpty(std::string request);
     std::vector<std::string> getJS(std::string request);
+    std::vector<std::string> getFavicon(std::string request);
+    std::vector<std::string> getImage(std::string request);
 }
 
 #endif

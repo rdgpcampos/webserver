@@ -113,10 +113,14 @@ namespace http {
 		std::vector<char> buffer(buffer_size);
         std::string cur_request; // request as string
         int bytes_received;
-        static std::string request;
+		static int body_length = 0;
+        static std::string request = "";
         static int cumulative_bytes = 0;
         static int read_attempts = 0;
         static int timeout_attempt = 0;
+
+		static int pos1 = 0;
+		static int pos2 = 0;
 
         // read from socket
 		bytes_received = readWithRetry(socket, &buffer[0], buffer_size); // receive request data from client and store into buffer
@@ -130,13 +134,20 @@ namespace http {
 
         // get read content
         cur_request.assign(&buffer[0],bytes_received);
-
+		if (cumulative_bytes == 0) {
+			pos1 = cur_request.find("Content-Length: ");
+			if (pos1 > 0) pos2 = cur_request.find("\n",pos1);
+			if (pos1 > 0) body_length = std::stoi(cur_request.substr(pos1+16,pos2-pos1-16));
+		}
         // cumulate content
         request.append(cur_request);
+
         cumulative_bytes += bytes_received;
 
+
+
         // repeat until request is entirely consumed from socket or max limit is reached
-        if(bytes_received == buffer_size && read_attempts < 100) {
+		if(body_length > 0 && cumulative_bytes < body_length && read_attempts < 100) {
             read_attempts++;
             return getRequestAsString(socket, buffer_size);
         }
@@ -151,6 +162,7 @@ namespace http {
         request.clear();
         read_attempts = 0;
         cumulative_bytes = 0;
+		body_length = 0;
 
         return return_string;
 
@@ -162,6 +174,7 @@ namespace http {
 
 		do {
 			bytes_received = read(*(int *)socket, buffer, buffer_size);
+
 			if (bytes_received < 0) {
 				if (read_attempts++ > 5) break;
 				std::this_thread::sleep_for(std::chrono::milliseconds(50)); // try again after 20 milliseconds
@@ -179,12 +192,13 @@ namespace http {
 
         do {
             bytes_sent_now = send(socket, &message[total_bytes_sent], message_size-total_bytes_sent, 0);
+
             if (bytes_sent_now > 0) {
 				total_bytes_sent += bytes_sent_now;
 				send_attempts = 0;
             } else {
                 std::this_thread::sleep_for(std::chrono::milliseconds(20)); // try again after 20 milliseconds
-                if (send_attempts++ > 5) return -1; // fail too many times
+                if (send_attempts++ > 10) return -1; // fail too many times
             }
         } while (total_bytes_sent < message_size);
 

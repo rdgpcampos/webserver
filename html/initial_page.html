@@ -2,17 +2,100 @@
     <head>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>
+        .title {
+          margin: auto;
+          width: auto;
+          color: #f1f1f1;
+          text-align: center;
+          background: #5a27a3;
+        }
+        .player {
+          position: fixed;
+          top: 30%;
+          left: 50%;
+          margin-top: -27px;
+          margin-left: -150px;
+        }
+
+        .song-option {
+          width: 150px;
+          background-color: #5a27a3;
+          margin-top: 2px;
+          margin-bottom: 2px;
+          color: #f1f1f1;
+          text-align: left;
+        }
+
+        .song-delete-button {
+          background-image: url('trashbin.jpeg');
+          background-size: cover;
+          height: 22px;
+          width: 22px;
+          margin-left: 2px;
+        }
+
+        .submit-modal {
+          position: absolute;
+          top: 30%;
+          left: 80%;
+          width: 400px;
+          height: 300px;
+        }
+
+        #backdrop {
+          position: fixed;
+          z-index: -1;
+          top: 0; left: 0; bottom: 0; right: 0;
+          background: #ffffff00;
+          backdrop-filter: blur(0);
+        }
+
+        #playlist-pane {
+          color: #f1f1f1;
+          text-align: left;
+          padding-top: 3px;
+          padding-bottom: 5px;
+          padding-left: 10px;
+          width: 200px;
+          height: 100%;
+          background: #8342ddd0;
+        }
+
+        #playlist-dropdown {
+          display: grid;
+          top: 30%;
+          width: 150px;
+        }
+
+        #modal {
+          position: absolute;
+          background: #f1f1f1;
+          top: 50%;
+          left: 50%;
+          margin-left: -125px;
+          margin-top: -70px;
+          display: none;
+          width: 250px;
+          height: 140px;
+          padding: 8px;
+          border: solid #07210e;
+          z-index: 9999;
+        }
         .dropbtn {
-          background-color: #3498DB;
+          position: fixed;
+          top: 30%;
+          left: 5%;
+          margin-top: -27px;
+          background-color: #1a7430;
           color: white;
-          padding: 16px;
-          font-size: 16px;
-          border: none;
+          padding: 8px;
+          font-size: 14px;
+          border: solid #07210e;
           cursor: pointer;
         }
         
         .dropbtn:hover, .dropbtn:focus {
-          background-color: #2980B9;
+          background-color: #07210e;
         }
 
         .player {
@@ -46,21 +129,31 @@
         .show {display: block;}
         </style>
     </head>
-    <body>
-        <script src="playlist.js"></script>
-        <h1> HOME </h1>
-        <p>Hello world! :)</p>
-        <audio id="audio-player" controls="controls" src="" type="audio/mp3" class="player"></audio>
-        <button id="delete-audio" onclick="deleteAudio()" name="">Delete song</button>
-        <div class="dropdown">
-            <button onclick="loadPlaylist()" class="dropbtn">Dropdown</button>
-            <div id="myDropdown" class="dropdown-content">
-            </div>
-        </div>
+    <body onload="loadPlaylist()" style="background-image: url('purple-background2.webp'); background-size: cover;">
+
+      <div id="backdrop" onclick="toggleModal(false)"></div>
+
+      <script src="playlist.js"></script>
+      <div class="title">
+        <h1> AWESOME MUSIC PLAYER </h1>
+      </div>
+
+      <audio id="audio-player" controls="controls" src="" type="audio/mp3" class="player"></audio>
+      
+      <div id="playlist-pane">
+        <p style="font-size:20px; text-align: center;">Your Playlist</p>
+        <div id="playlist-dropdown"></div>
+      </div>
+
+      <div class="submit-modal">
+        <button onclick="toggleModal(true)">Add a song</button>
+      </div>
+      <div id="modal">
         <form action="javascript:;" onsubmit="sendFileToServer()" class="submit">
-            <input type="file" id="myFile" name="filename">
-            <input type="submit">    
+          <input type="file" id="myFile" name="filename">
+          <input type="submit">    
         </form>
+      </div>
         
     </body>
 </html>
